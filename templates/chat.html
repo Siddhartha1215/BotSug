@@ -3,11 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>AI Chat Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+    
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+    
+        nav {
+            background-color: #1e2937;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+    
+        .chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+    
+        #chat {
+            height: 60vh;
+            border: 1px solid #333;
+            padding: 20px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #2d2d2d;
+        }
+    
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            display: inline-block;
+            clear: both;
+            max-width: 70%;
+        }
+    
+        .user-message {
+            background-color: #2563eb;
+            color: white;
+            float: right;
+        }
+    
+        .bot-message {
+            background-color: #065f46;
+            color: white;
+            float: left;
+        }
+    
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+    
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: #2d2d2d;
+            color: white;
+        }
+    
+        #user-input::placeholder {
+            color: #6b7280;
+        }
+    
+        #send-button {
+            padding: 10px 20px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+    
+        #send-button:hover {
+            background-color: #1d4ed8;
+        }
+    
+        /* Clear fix for floating messages */
+        #chat::after {
+            content: '';
+            display: table;
+            clear: both;
+        }
+    </style>
 </head>
 <body>
     <nav>
-        <h1>Chat Bot</h1>
+        <h1>AI Chat Assistant</h1>
     </nav>
+    <div class="chat-container">
+        <div id="chat"></div>
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Type your message here...">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatDiv = document.getElementById('chat');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+
+            function addMessage(message, isUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+                messageDiv.textContent = message;
+                chatDiv.appendChild(messageDiv);
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            }
+
+            async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+
+            // Add user message to chat
+            addMessage(message, true);
+            userInput.value = '';
+
+            try {
+                const response = await fetch('http://localhost:5000/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    addMessage(data.response, false);
+                } else {
+                    addMessage('Error: ' + data.message, false);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('Sorry, something went wrong!', false);
+            }
+        }
+
+            // Event listeners
+            sendButton.addEventListener('click', sendMessage);
+            userInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
