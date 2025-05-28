@@ -7,3 +7,4 @@ langchain
 pandas 
 numpy
 python-dotenv
+langchain-community
