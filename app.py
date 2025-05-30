@@ -52,12 +52,19 @@ graph_builder = StateGraph(State).add_sequence([retrieve, generate])
 graph_builder.add_edge(START, "retrieve")
 graph = graph_builder.compile()
 
-# Flask Routes
-@app.route("/", methods=["GET", "POST"])
+# ROUTES
+
+# Home page with two buttons
+@app.route("/")
 def index():
+    return render_template("index.html")
+
+# AI Chat route with LangChain logic
+@app.route("/ai-chat", methods=["GET", "POST"])
+def ai_chat():
     response = ""
     if request.method == "POST":
-        question = request.form["question"]
+        question = request.form.get("question")
         result = graph.invoke({"question": question})
         response = result["answer"]
     return render_template("chat.html", response=response)
