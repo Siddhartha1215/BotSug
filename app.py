@@ -16,6 +16,7 @@ import datetime
 from custom_prompt import RAG_PROMPT
 import logging
 import re
+import json
 
 
 # Suppress warnings
@@ -49,10 +50,89 @@ class State(TypedDict):
     answer: str
     chat_history: str
     suggested_questions: str
+    parent_student_id: str  # Add this field
+    access_denied: bool     # Add this field too
+
+def detect_chart_request(question):
+    """Detect if the user is requesting a chart and what type"""
+    chart_keywords = {
+        'bar': ['bar chart', 'bar graph', 'column chart', 'bar plot'],
+        'pie': ['pie chart', 'pie graph', 'pie diagram'],
+        'line': ['line chart', 'line graph', 'trend chart', 'line plot'],
+        'doughnut': ['doughnut chart', 'donut chart', 'ring chart'],
+        'general': ['chart', 'graph', 'visualize', 'plot', 'diagram', 'histogram']
+    }
+    
+    question_lower = question.lower()
+    
+    for chart_type, keywords in chart_keywords.items():
+        for keyword in keywords:
+            if keyword in question_lower:
+                return chart_type
+    
+    return None
+
+def generate_chart_prompt(question, chart_type, context_data=""):
+    """Generate a prompt to create Chart.js configuration"""
+    return f"""
+Based on the user's question: "{question}"
+And this student data context: {context_data[:1000]}...
+
+Generate a complete Chart.js configuration object for a {chart_type} chart that visualizes student performance data.
+
+Requirements:
+1. Return ONLY a valid JSON object that can be used directly with Chart.js
+2. Use realistic student performance data based on the context (CGPA, grades, subjects, etc.)
+3. Include proper labels, datasets, and styling
+4. Use attractive colors: primary blue (#667eea), secondary purple (#764ba2), green (#10b981), orange (#f59e0b)
+5. Include responsive options
+6. For pie/doughnut charts, use different colors for each segment
+
+The response should be a valid JSON object starting with {{"type": "..." }} and include all necessary Chart.js configuration.
+
+Example structure:
+{{
+    "type": "{chart_type}",
+    "data": {{
+        "labels": [...],
+        "datasets": [{{
+            "label": "...",
+            "data": [...],
+            "backgroundColor": [...],
+            "borderColor": [...],
+            "borderWidth": 1
+        }}]
+    }},
+    "options": {{
+        "responsive": true,
+        "maintainAspectRatio": false,
+        "plugins": {{
+            "legend": {{"position": "top"}},
+            "tooltip": {{"enabled": true}}
+        }}
+    }}
+}}
+
+Generate the chart configuration now:
+"""
 
 def retrieve(state: State):
     query = state["question"]
+    logger.info(f"=== RETRIEVE DEBUG ===")
     logger.info(f"Query: {query}")
+    logger.info(f"State keys: {list(state.keys())}")
+    logger.info(f"Full state: {state}")  # Add this to see the full state
+    
+    # Check if this is a parent request with student filtering
+    parent_student_id = state.get("parent_student_id", None)
+    is_parent_request = parent_student_id is not None
+    
+    logger.info(f"Parent student ID: {parent_student_id}")
+    logger.info(f"Is parent request: {is_parent_request}")
+    
+    # If we still don't have parent_student_id but expected it, log error
+    if not parent_student_id:
+        logger.error("Expected parent_student_id but it's None or missing!")
     
     # Detect if user is asking for "all students" or comprehensive data
     comprehensive_keywords = [
@@ -62,6 +142,81 @@ def retrieve(state: State):
     ]
     is_comprehensive_query = any(keyword in query.lower() for keyword in comprehensive_keywords)
     
+    # Check if parent is asking about their specific child
+    child_specific_keywords = [
+        "my child", "my student", f"student id {parent_student_id}" if parent_student_id else "",
+        "progress", "performance", "grades", "marks", "cgpa", "gpa"
+    ]
+    is_child_specific = any(keyword in query.lower() for keyword in child_specific_keywords if keyword)
+    
+    # For parents asking general questions (averages, statistics, etc.)
+    general_query_keywords = [
+        "average", "mean", "statistics", "overall", "general", "typically",
+        "usually", "common", "standard", "benchmark", "comparison"
+    ]
+    is_general_query = any(keyword in query.lower() for keyword in general_query_keywords)
+    
+    logger.info(f"Is comprehensive query: {is_comprehensive_query}")
+    logger.info(f"Is child specific: {is_child_specific}")
+    logger.info(f"Is general query: {is_general_query}")
+    
+    if is_parent_request:
+        logger.info("=== PARENT REQUEST DETECTED ===")
+        
+        if is_child_specific or f"student id {parent_student_id}" in query.lower() or parent_student_id in query:
+            # Parent asking about their child - filter by student ID
+            logger.info(f"Parent query about their child - filtering for student ID: {parent_student_id}")
+            
+            # Search with metadata filter for the specific student
+            try:
+                retrieved_docs = vector_store.similarity_search(
+                    query, 
+                    k=10,
+                    filter={"roll_no": parent_student_id}  # Filter by roll_no metadata
+                )
+                logger.info(f"Search with roll_no filter returned {len(retrieved_docs)} docs")
+            except Exception as e:
+                logger.error(f"Error with roll_no filter: {e}")
+                retrieved_docs = []
+            
+            if not retrieved_docs:
+                # If no docs found with exact roll_no, try alternative metadata fields
+                alternative_searches = [
+                    {"student_id": parent_student_id},
+                    {"roll": parent_student_id}
+                ]
+                
+                for filter_dict in alternative_searches:
+                    try:
+                        retrieved_docs = vector_store.similarity_search(query, k=10, filter=filter_dict)
+                        if retrieved_docs:
+                            logger.info(f"Found documents using filter: {filter_dict}")
+                            break
+                    except Exception as e:
+                        logger.error(f"Error with filter {filter_dict}: {e}")
+                        continue
+            
+            if not retrieved_docs:
+                # Return empty context - will be handled in generate function
+                logger.info(f"No documents found for student ID: {parent_student_id}")
+                return {"context": []}
+            
+            logger.info(f"Retrieved {len(retrieved_docs)} documents for student {parent_student_id}")
+            return {"context": retrieved_docs}
+            
+        elif is_general_query:
+            # Parent asking general questions - allow access to aggregate data
+            logger.info("Parent asking general question - allowing access to aggregate data")
+            retrieved_docs = vector_store.similarity_search(query, k=8)
+            return {"context": retrieved_docs}
+            
+        else:
+            # Parent asking about other students - deny access
+            logger.info("=== ACCESS DENIED - Parent asking about other students ===")
+            return {"context": [], "access_denied": True}
+    
+    # Faculty or non-parent users - full access
+    logger.info("=== FACULTY REQUEST - Full access granted ===")
     if is_comprehensive_query:
         logger.info("Detected comprehensive query - using summarized retrieval")
         # For comprehensive queries, get more results but use summarized retrieval
@@ -118,6 +273,20 @@ def retrieve(state: State):
         return {"context": retrieved_docs}
 
 def generate(state: State):
+    # Check for access denial
+    if state.get("access_denied", False):
+        return {
+            "answer": "I'm sorry, but as a parent, you can only access information about your child or ask general questions about averages and statistics. You don't have permission to view other students' data.",
+            "suggested_questions": "1. How is my child performing?\n2. What is my child's current CGPA?\n3. What is the average CGPA of the class?"
+        }
+    
+    # Check if no documents found for parent's child
+    if len(state["context"]) == 0 and state.get("parent_student_id"):
+        return {
+            "answer": f"I couldn't find any information for student ID {state['parent_student_id']}. Please make sure the student ID is correct or contact the administration if you believe this is an error.",
+            "suggested_questions": "1. Contact administration for help\n2. Verify the student ID\n3. Ask about general class statistics"
+        }
+    
     docs_content = "\n\n".join(doc.page_content for doc in state["context"])
     logger.info(f"Total context length: {len(docs_content)} characters")
     
@@ -185,7 +354,17 @@ graph = graph_builder.compile()
 # home
 @app.route("/")
 def index():
-    return render_template("index.html")
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
+    return redirect(url_for("ai_chat"))
+
+# Custom filter for JSON serialization in templates
+@app.template_filter('tojsonfilter')
+def to_json_filter(obj):
+    if obj is None:
+        return 'null'
+    # Use separators to avoid extra spaces and ensure compact JSON
+    return json.dumps(obj, separators=(',', ':'))
 
 # pdf chat
 @app.route("/ai-chat", methods=["GET", "POST"])
@@ -195,6 +374,18 @@ def ai_chat():
             return jsonify({"error": "Authentication required"}), 401
         return redirect(url_for("auth.login"))
 
+    # Check user type and set appropriate context
+    user_type = session.get("user_type", "faculty")
+    student_id = session.get("student_id", None)
+    student_name = session.get("student_name", "Student")
+    
+    # Debug logging for session data
+    logger.info(f"=== SESSION DEBUG ===")
+    logger.info(f"User Type: {user_type}")
+    logger.info(f"Student ID: {student_id}")
+    logger.info(f"Student Name: {student_name}")
+    logger.info(f"Session keys: {list(session.keys())}")
+    
     # Initialize chat history if it doesn't exist
     if "chat_history" not in session:
         session["chat_history"] = []
@@ -223,15 +414,80 @@ def ai_chat():
         session["chat_history"].append(user_message)
         session.modified = True  # Ensure session is saved
         
-        # Get answer using the graph with chat context
+        # Detect if user wants a chart
+        chart_type = detect_chart_request(question)
+        chart_data = None
+        
         try:
-            result = graph.invoke({
+            # Prepare state for graph execution
+            graph_state = {
                 "question": question,
                 "chat_history": session["chat_context"]
-            })
+            }
+            
+            # IMPORTANT FIX: Add parent student ID for access control
+            if user_type == "parent" and student_id:
+                graph_state["parent_student_id"] = student_id
+                logger.info(f"Added parent_student_id to graph state: {student_id}")
+            
+            # Additional debug logging
+            logger.info(f"Graph state keys: {list(graph_state.keys())}")
+            logger.info(f"Graph state parent_student_id: {graph_state.get('parent_student_id', 'NOT SET')}")
+            
+            # Get answer using the graph with chat context
+            result = graph.invoke(graph_state)
             
             response = result["answer"]
             suggested_questions = result.get("suggested_questions", "")
+            
+            # If chart was requested, generate chart data (only for allowed content)
+            if chart_type and chart_type != 'general' and not result.get("access_denied", False):
+                try:
+                    # Get context data for chart generation
+                    docs_content = "\n\n".join(doc.page_content for doc in result.get("context", []))
+                    chart_prompt = generate_chart_prompt(question, chart_type, docs_content)
+                    chart_response = llm.invoke([{"role": "user", "content": chart_prompt}])
+                    
+                    # Extract JSON from the response
+                    chart_response_content = chart_response.content.strip()
+                    
+                    # Try to find JSON in the response
+                    json_start = chart_response_content.find('{')
+                    json_end = chart_response_content.rfind('}') + 1
+                    
+                    if json_start != -1 and json_end > json_start:
+                        chart_json = chart_response_content[json_start:json_end]
+                        chart_data = json.loads(chart_json)
+                        
+                        # Add some default styling if missing
+                        if 'options' not in chart_data:
+                            chart_data['options'] = {}
+                        
+                        chart_data['options'].update({
+                            'responsive': True,
+                            'maintainAspectRatio': False,
+                            'plugins': {
+                                'legend': {
+                                    'position': 'top',
+                                },
+                                'tooltip': {
+                                    'enabled': True,
+                                    'backgroundColor': 'rgba(0, 0, 0, 0.8)',
+                                    'titleColor': '#fff',
+                                    'bodyColor': '#fff'
+                                }
+                            }
+                        })
+                        
+                        response += f"\n\n📊 I've generated a {chart_type} chart to visualize the data above."
+                        
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error parsing chart JSON: {e}")
+                    chart_data = None
+                    response += "\n\n⚠️ I tried to create a chart but encountered a formatting issue. The data above should still be helpful!"
+                except Exception as e:
+                    logger.error(f"Error generating chart: {e}")
+                    chart_data = None
             
             # Format suggested questions for display
             formatted_suggestions = []
@@ -243,23 +499,41 @@ def ai_chat():
                     if q and len(q) > 3:  # Ensure question is meaningful
                         formatted_suggestions.append(q)
             
-            # Add bot response to history with suggestions
+            # Add user-type specific suggestions
+            if user_type == "parent":
+                if student_id:
+                    parent_suggestions = [
+                        f"How is my child (ID: {student_id}) performing?",
+                        f"What subjects need attention for student {student_id}?",
+                        "What's the average CGPA of the class?"
+                    ]
+                    formatted_suggestions.extend(parent_suggestions[:2])
+            elif chart_data:
+                chart_suggestions = [
+                    f"Show me a different type of chart for this data",
+                    f"Create a line chart for trend analysis",
+                    f"Generate a pie chart for grade distribution"
+                ]
+                formatted_suggestions.extend(chart_suggestions[:2])
+            
+            # Add bot response to history with suggestions and chart data
             bot_message = {
                 "type": "bot",
                 "content": response,
                 "timestamp": current_time,
-                "suggestions": formatted_suggestions[:3]  # Limit to 3 suggestions
+                "suggestions": formatted_suggestions[:3],  # Limit to 3 suggestions
+                "chart_data": chart_data
             }
             
             session["chat_history"].append(bot_message)
             
             # Dynamic chat history management based on response size
-            is_large_response = len(response) > 2000
+            is_large_response = len(response) > 2000 or chart_data is not None
             
             if is_large_response:
                 # For large responses (like "all students"), keep minimal history
                 max_history_items = 2  # Only last Q&A pair
-                logger.info("Large response detected - reducing chat history")
+                logger.info("Large response/chart detected - reducing chat history")
             else:
                 # For normal responses, keep more history
                 max_history_items = 4  # Last 2 Q&A pairs
@@ -302,9 +576,15 @@ def ai_chat():
                 flash(error_msg)
                 return redirect(url_for('ai_chat'))
     
-    # For GET requests, just render the template
-    return render_template("chat.html", chat_history=session.get("chat_history", []))
-
+    # For GET requests, render template with user context
+    template_data = {
+        "chat_history": session.get("chat_history", []),
+        "user_type": user_type,
+        "student_id": student_id,
+        "student_name": student_name
+    }
+    
+    return render_template("chat.html", **template_data)
 
 # Clear chat history route
 @app.route("/clear-chat", methods=["POST"])

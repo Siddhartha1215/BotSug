@@ -345,7 +345,7 @@ body {
 .message-input {
     border: none;
     outline: none;
-    padding: 16px 60px 16px 20px;
+    padding: 16px 60px 16px 50px; /* Updated left padding for chart button */
     font-size: 16px;
     width: 100%;
     background: transparent;
@@ -515,6 +515,147 @@ body {
     display: flex;
 }
 
+/* Chart-specific styles */
+.chart-container {
+    margin: 16px 0;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.chart-container canvas {
+    max-width: 100%;
+    height: auto !important;
+    max-height: 400px;
+}
+
+.chart-command-btn {
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 50%;
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 14px;
+}
+
+.chart-command-btn:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.4);
+    transform: translateY(-50%) scale(1.05);
+}
+
+.chart-options {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: var(--transition);
+    z-index: 10;
+}
+
+.chart-options.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.chart-options-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+    color: #334155;
+}
+
+.close-chart-options {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: var(--transition);
+}
+
+.close-chart-options:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #334155;
+}
+
+.chart-types {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 16px;
+}
+
+.chart-type-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(102, 126, 234, 0.05);
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    border-radius: 12px;
+    color: #667eea;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.chart-type-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.3);
+    transform: translateY(-1px);
+}
+
+.chart-type-btn i {
+    font-size: 16px;
+}
+
+.chart-suggestions {
+    padding: 12px 16px 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.chart-suggestions small {
+    color: #64748b;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.chart-action {
+    background: rgba(16, 185, 129, 0.1) !important;
+    border-color: rgba(16, 185, 129, 0.2) !important;
+    color: #10b981 !important;
+}
+
+.chart-action:hover {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     body { padding: 10px; }
@@ -525,6 +666,23 @@ body {
     .message { max-width: 90%; }
     .chat-title { font-size: 1.5rem; }
     .quick-actions { justify-content: center; }
+}
+
+/* Mobile responsiveness for chart options */
+@media (max-width: 768px) {
+    .chart-types {
+        grid-template-columns: 1fr;
+    }
+    
+    .chart-command-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+    
+    .message-input {
+        padding: 16px 60px 16px 45px;
+    }
 }
 
 /* Dark mode support */
@@ -556,6 +714,39 @@ body {
     }
     
     .message-input::placeholder {
+        color: #94a3b8;
+    }
+    
+    .chart-container {
+        background: rgba(51, 65, 85, 0.3);
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    .chart-options {
+        background: #334155;
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    .chart-options-header {
+        color: #e2e8f0;
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .chart-type-btn {
+        background: rgba(102, 126, 234, 0.15);
+        border-color: rgba(102, 126, 234, 0.3);
+        color: #a5b4fc;
+    }
+    
+    .chart-type-btn:hover {
+        background: rgba(102, 126, 234, 0.25);
+    }
+    
+    .chart-suggestions {
+        border-top-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .chart-suggestions small {
         color: #94a3b8;
     }
 }
