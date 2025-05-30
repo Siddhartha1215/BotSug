@@ -5,7 +5,128 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Add marked.js for markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@5.0.0/marked.min.js"></script>
     <style>
+        /* Add styles for rendered markdown content */
+        .message-content {
+            line-height: 1.6;
+        }
+        
+        .message-content h1,
+        .message-content h2,
+        .message-content h3,
+        .message-content h4,
+        .message-content h5,
+        .message-content h6 {
+            margin: 0.5em 0;
+            font-weight: 600;
+        }
+        
+        .message-content p {
+            margin: 0.5em 0;
+        }
+        
+        .message-content ul,
+        .message-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+        
+        .message-content li {
+            margin: 0.25em 0;
+        }
+        
+        .message-content strong {
+            font-weight: 600;
+            color: inherit;
+        }
+        
+        .message-content em {
+            font-style: italic;
+        }
+        
+        .message-content code {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .bot-message .message-content code {
+            background: rgba(102, 126, 234, 0.15);
+        }
+        
+        .user-message .message-content code {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 1em;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+        
+        .message-content pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .message-content blockquote {
+            border-left: 4px solid rgba(102, 126, 234, 0.3);
+            margin: 0.5em 0;
+            padding: 0.5em 1em;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.5em 0;
+            font-size: 0.9em;
+        }
+        
+        .message-content th,
+        .message-content td {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 0.5em;
+            text-align: left;
+        }
+        
+        .message-content th {
+            background: rgba(102, 126, 234, 0.1);
+            font-weight: 600;
+        }
+        
+        /* Dark mode support for markdown */
+        @media (prefers-color-scheme: dark) {
+            .message-content code {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            
+            .message-content pre {
+                background: rgba(255, 255, 255, 0.05);
+            }
+            
+            .message-content blockquote {
+                border-left-color: rgba(102, 126, 234, 0.5);
+                background: rgba(102, 126, 234, 0.1);
+            }
+            
+            .message-content th,
+            .message-content td {
+                border-color: rgba(255, 255, 255, 0.1);
+            }
+            
+            .message-content th {
+                background: rgba(102, 126, 234, 0.2);
+            }
+        }
+
         :root {
             --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -487,12 +608,12 @@
                     {% for message in chat_history %}
                         {% if message.type == 'user' %}
                             <div class="message user-message">
-                                {{ message.content }}
+                                <div class="message-content">{{ message.content }}</div>
                                 <div class="timestamp">{{ message.timestamp }}</div>
                             </div>
                         {% else %}
                             <div class="message bot-message">
-                                {{ message.content }}
+                                <div class="message-content" data-markdown="true">{{ message.content }}</div>
                                 <div class="timestamp">{{ message.timestamp }}</div>
                                 
                                 {% if message.suggestions %}
@@ -580,6 +701,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let isSubmitting = false;
     
+    // Configure marked.js for safe HTML rendering
+    marked.setOptions({
+        sanitize: false,
+        breaks: true,
+        gfm: true
+    });
+    
+    // Function to render markdown content
+    function renderMarkdown(element) {
+        if (element.hasAttribute('data-markdown') && !element.hasAttribute('data-rendered')) {
+            const markdownText = element.textContent;
+            const htmlContent = marked.parse(markdownText);
+            element.innerHTML = htmlContent;
+            element.setAttribute('data-rendered', 'true');
+        }
+    }
+    
+    // Render existing markdown content on page load
+    function renderExistingMarkdown() {
+        const markdownElements = document.querySelectorAll('[data-markdown]');
+        markdownElements.forEach(renderMarkdown);
+    }
+    
+    // Call this on page load
+    renderExistingMarkdown();
+    
     // Auto-scroll to bottom
     function scrollToBottom() {
         setTimeout(() => {
@@ -644,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message user-message';
         messageDiv.innerHTML = `
-            ${escapeHtml(message)}
+            <div class="message-content">${escapeHtml(message)}</div>
             <div class="timestamp">${new Date().toLocaleTimeString()}</div>
         `;
         
@@ -704,9 +851,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message bot-message';
                 
-                // Create message content
+                // Create message content with markdown support
                 let messageHTML = `
-                    ${botMessage.content}
+                    <div class="message-content" data-markdown="true">${botMessage.content}</div>
                     <div class="timestamp">${botMessage.timestamp}</div>
                 `;
                 
@@ -724,6 +871,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 messageDiv.innerHTML = messageHTML;
+                
+                // Render markdown for the new message
+                const markdownElement = messageDiv.querySelector('[data-markdown]');
+                if (markdownElement) {
+                    renderMarkdown(markdownElement);
+                }
+                
                 chatMessages.insertBefore(messageDiv, typingIndicator);
                 scrollToBottom();
             }
