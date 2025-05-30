@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, redirect, url_for
 import os
 import warnings
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ from typing_extensions import List, TypedDict
 from langgraph.graph import START, StateGraph
 from langchain_pinecone import PineconeVectorStore
 from langchain_cohere import CohereEmbeddings
+from auth import auth_bp
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -23,6 +24,8 @@ os.environ["USER_AGENT"] = "BotSugApp/1.0"
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY", "dummy")
 os.environ["COHERE_API_KEY"] = os.getenv("COHERE_API_KEY")
 os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+app.secret_key = os.getenv("SECRET_KEY", "your-secret-key")
+app.register_blueprint(auth_bp)
 
 # Vector store and LLM setup
 embeddings = CohereEmbeddings(model="embed-english-v3.0")
@@ -39,7 +42,8 @@ class State(TypedDict):
     answer: str
 
 def retrieve(state: State):
-    retrieved_docs = vector_store.similarity_search(state["question"])
+    # Increase the k parameter to get more results, e.g., k=20 for 20 students
+    retrieved_docs = vector_store.similarity_search(state["question"], k=10)
     return {"context": retrieved_docs}
 
 def generate(state: State):
@@ -52,16 +56,17 @@ graph_builder = StateGraph(State).add_sequence([retrieve, generate])
 graph_builder.add_edge(START, "retrieve")
 graph = graph_builder.compile()
 
-# ROUTES
-
-# Home page with two buttons
+#home
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# AI Chat route with LangChain logic
+#pdf chat
 @app.route("/ai-chat", methods=["GET", "POST"])
 def ai_chat():
+    if "user" not in session:
+        return redirect(url_for("auth.login"))
+
     response = ""
     if request.method == "POST":
         question = request.form.get("question")
@@ -70,4 +75,4 @@ def ai_chat():
     return render_template("chat.html", response=response)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)

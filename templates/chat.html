@@ -5,7 +5,11 @@
 </head>
 <body>
     <h2>Ask me a question</h2>
-    <form action="/" method="post">
+    {% if session.get('user') %}
+        <p>Logged in as {{ session.get('user') }}</p>
+    {% endif %}
+
+    <form action="ai-chat" method="post">
         <input type="text" name="question" required placeholder="Enter your question" style="width: 300px;" />
         <button type="submit">Ask</button>
     </form>

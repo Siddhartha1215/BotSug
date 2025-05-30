@@ -1,20 +1,22 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home</title>
+    <title>Welcome - AI Bot</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to Chat Services</h1>
-        <div class="chat-options">
-            <a href="/advisor-chat" class="chat-button">Advisor Chat</a>
-            <a href="/ai-chat" class="chat-button">AI Chat</a>
-        </div>
-    </div>
+    <h1>Welcome to Advisory Bridge AI Bot</h1>
 
-    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+    {% if session.get('user') %}
+        <p>Hello, {{ session.get('user') }}!</p>
+        <a href="{{ url_for('ai_chat') }}">Go to AI Chat</a><br>
+        <a href="{{ url_for('ai_chat') }}">Go to AI Chat</a><br>
+        <a href="{{ url_for('auth.logout') }}">Logout</a>
+    {% else %}
+        <a href="{{ url_for('auth.login') }}">Login</a> |
+        <a href="{{ url_for('auth.register') }}">Register</a>
+    {% endif %}
 </body>
 </html>
