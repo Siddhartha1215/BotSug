@@ -1,8 +1,6 @@
 unstructured
 tiktoken
 pinecone
-pypdf
-openai
 langchain
 pandas 
 numpy
