@@ -6,3 +6,8 @@ pandas
 numpy
 python-dotenv
 langchain-community
+flask
+langgraph
+pymongo
+psycopg2
+langchain-groq

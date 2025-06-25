@@ -26,14 +26,24 @@
                                 <p class="user-info m-0 mt-2">
                                     <i class="fas fa-user-circle"></i>
                                     {{ session.get('user') }}
+                                    {% if user_type == 'parent' and student_id %}
+                                        <span class="badge bg-primary ms-2">Parent ({{ student_id }})</span>
+                                    {% elif user_type == 'faculty' %}
+                                        <span class="badge bg-success ms-2">Faculty</span>
+                                    {% endif %}
                                 </p>
                             {% endif %}
                         </div>
-                        <form action="{{ url_for('clear_chat') }}" method="post">
-                            <button type="submit" class="clear-button" title="Clear chat history">
-                                <i class="fas fa-trash-alt me-2"></i>Clear
-                            </button>
-                        </form>
+                        <div class="header-actions">
+                            <form action="{{ url_for('chat.clear_chat') }}" method="post" style="display: inline;">
+                                <button type="submit" class="clear-button" title="Clear chat history">
+                                    <i class="fas fa-trash-alt me-2"></i>Clear
+                                </button>
+                            </form>
+                            <a href="{{ url_for('auth.logout') }}" class="logout-button" title="Logout">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -83,18 +93,33 @@
                         <p>Ask me about student performance, grades, attendance, or generate progress reports!</p>
                         
                         <div class="quick-actions">
-                            <button class="quick-action" onclick="fillInput('Show me John Smith\\'s progress report')">
-                                <i class="fas fa-chart-line"></i>
-                                Progress Report
-                            </button>
-                            <button class="quick-action" onclick="fillInput('What are the class averages for Math?')">
-                                <i class="fas fa-calculator"></i>
-                                Class Averages
-                            </button>
-                            <button class="quick-action" onclick="fillInput('Show attendance report for this week')">
-                                <i class="fas fa-calendar-check"></i>
-                                Attendance
-                            </button>
+                            {% if user_type == 'parent' and student_id %}
+                                <button class="quick-action" onclick="fillInput('Show me my child\\'s ({{ student_id }}) complete performance report')">
+                                    <i class="fas fa-chart-line"></i>
+                                    My Child's Progress
+                                </button>
+                                <button class="quick-action" onclick="fillInput('Compare my child\\'s CGPA between semesters')">
+                                    <i class="fas fa-balance-scale"></i>
+                                    Semester Comparison
+                                </button>
+                                <button class="quick-action" onclick="fillInput('Show class average performance')">
+                                    <i class="fas fa-calculator"></i>
+                                    Class Averages
+                                </button>
+                            {% else %}
+                                <button class="quick-action" onclick="fillInput('Show me top performing students with O grades')">
+                                    <i class="fas fa-trophy"></i>
+                                    Top Performers
+                                </button>
+                                <button class="quick-action" onclick="fillInput('Compare semester 1 vs semester 2 performance')">
+                                    <i class="fas fa-chart-line"></i>
+                                    Semester Analysis
+                                </button>
+                                <button class="quick-action" onclick="fillInput('Show attendance patterns across both semesters')">
+                                    <i class="fas fa-calendar-check"></i>
+                                    Attendance Report
+                                </button>
+                            {% endif %}
                             <button class="quick-action chart-action" onclick="showChartOptions()">
                                 <i class="fas fa-chart-bar"></i>
                                 Generate Chart
@@ -144,7 +169,7 @@
                     </div>
                 </div>
                 
-                <form action="{{ url_for('ai_chat') }}" method="post" id="chat-form">
+                <form action="{{ url_for('chat.ai_chat') }}" method="post" id="chat-form">
                     <div class="input-container" id="input-container">
                         <button type="button" class="chart-command-btn" id="chart-command-btn" onclick="toggleChartOptions()" title="Generate Charts">
                             <i class="fas fa-chart-bar"></i>
@@ -154,7 +179,7 @@
                             name="question" 
                             id="message-input"
                             class="message-input" 
-                            placeholder="Ask about student progress, grades, attendance..." 
+                            placeholder="{% if user_type == 'parent' %}Ask about your child's progress, grades, or class statistics...{% else %}Ask about student progress, grades, attendance...{% endif %}" 
                             required 
                             autofocus 
                             autocomplete="off"
@@ -414,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('question', message);
         
         // Send the request
-        fetch('{{ url_for("ai_chat") }}', {
+        fetch('{{ url_for("chat.ai_chat") }}', {
             method: 'POST',
             body: formData,
             headers: {
