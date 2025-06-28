@@ -3,3 +3,5 @@
 __pycache__/
 documents/
 markdownfiles/
+RAG/__pycache__/
+qdrant_data/
