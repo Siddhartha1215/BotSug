@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for, session
+from flask import Flask, redirect, url_for, session, render_template
 import os
 import warnings
 import logging
@@ -25,7 +25,8 @@ app.register_blueprint(chat_bp)
 def index():
     if "user" not in session:
         return redirect(url_for("auth.login"))
-    return redirect(url_for("chat.ai_chat"))
+    # return redirect(url_for("chat.ai_chat"))
+    return render_template("index.html")
 
 @app.template_filter('tojsonfilter')
 def to_json_filter(obj):

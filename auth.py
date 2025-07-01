@@ -100,7 +100,8 @@ def login():
                     session["user_type"] = "parent"
                     session["student_id"] = student_id
                     session["student_name"] = f"Student {student_id}"  # Better default name
-                    return redirect(url_for("chat.ai_chat"))  # Redirect to chat instead of rendering template
+                    # return redirect(url_for("chat.ai_chat"))  # Redirect to chat instead of rendering template
+                    return render_template("index.html")
             else:
                 # Faculty login
                 if user_type == "parent":
@@ -108,7 +109,8 @@ def login():
                 else:
                     session["user"] = user["username"]
                     session["user_type"] = "faculty"
-                    return redirect(url_for("chat.ai_chat"))  # Redirect to chat instead of rendering template
+                    # return redirect(url_for("chat.ai_chat"))  # Redirect to chat instead of rendering template
+                    return render_template("index.html")
         else:
             message = "Invalid credentials."
     
